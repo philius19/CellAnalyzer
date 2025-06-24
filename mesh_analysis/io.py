@@ -66,6 +66,8 @@ def load_curvature_data_raw(filepath: Path) -> np.ndarray:
     curv_raw_data = loadmat(str(filepath))
     curv_raw_data = np.array(curv_raw_data['meanCurvatureUnsmoothed']).flatten()
 
+    return curv_raw_data
+
 
 def load_gauss_data(filepath: Path) -> np.ndarray:
 
@@ -74,11 +76,6 @@ def load_gauss_data(filepath: Path) -> np.ndarray:
     gauss_data = np.array(gauss_data['gaussCurvatureUnsmoothed']).flatten()
 
     return gauss_data
-
-
-
-
-
 
 
 def save_mesh_to_ply(mesh, filepath: Path) -> None:

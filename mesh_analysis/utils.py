@@ -11,7 +11,7 @@ def convert_pixels_to_um(value: float, pixel_size: float) -> float:
     return value * pixel_size
 
 
-def calculate_mesh_quality_metrics(mesh: trimesh.Trimesh) -> Dict:
+def calculate_mesh_quality_metrics(mesh: trimesh.Trimesh, verbose: bool = False) -> Dict:
     """
     Calculate mesh quality metrics.
     
@@ -27,12 +27,13 @@ def calculate_mesh_quality_metrics(mesh: trimesh.Trimesh) -> Dict:
     # Edge lengths
     edge_lengths = mesh.edges_unique_length
 
-    print("=== MESH INTEGRITY CHECK ===")
-    print(f"Is watertight (closed): {mesh.is_watertight}")
-    print(f"Is winding consistent: {mesh.is_winding_consistent}")
-    print(f"Has vertex normals: {mesh.vertex_normals is not None}")
-    print(f"Volume: {mesh.volume}")
-    print(f"Euler number: {mesh.euler_number}")
+    if verbose:
+        print("=== MESH INTEGRITY CHECK ===")
+        print(f"Is watertight (closed): {mesh.is_watertight}")
+        print(f"Is winding consistent: {mesh.is_winding_consistent}")
+        print(f"Has vertex normals: {mesh.vertex_normals is not None}")
+        print(f"Volume: {mesh.volume}")
+        print(f"Euler number: {mesh.euler_number}")
     
     return {
         'triangle_area': {

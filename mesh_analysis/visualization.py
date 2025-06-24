@@ -6,6 +6,34 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+# Set Nature-style plotting parameters
+plt.rcParams.update({
+    'font.family': 'Arial',
+    'font.size': 8,
+    'axes.linewidth': 0.5,
+    'axes.spines.top': False,
+    'axes.spines.right': False,
+    'xtick.major.width': 0.5,
+    'ytick.major.width': 0.5,
+    'xtick.minor.width': 0.3,
+    'ytick.minor.width': 0.3,
+    'lines.linewidth': 1.0,
+    'patch.linewidth': 0.5,
+    'figure.dpi': 300
+})
+
+# Nature color palette
+NATURE_COLORS = {
+    'blue': '#2E86AB',
+    'red': '#E63946', 
+    'gray': '#6C757D',
+    'light_gray': '#ADB5BD',
+    'dark_gray': '#343A40',
+    'green': '#028A0F',
+    'orange': '#F77F00'
+}
+
+
 
 def plot_curvature_distribution(curvature: np.ndarray, 
                               save_path: Optional[str] = None) -> plt.Figure:
@@ -23,7 +51,7 @@ def plot_curvature_distribution(curvature: np.ndarray,
 
     # Linear scale
     ax1.hist(curvature, bins=100, alpha=0.7)
-    ax1.axvline(0, color='red', linestyle='--', label='Zero')
+    ax1.axvline(0, color=NATURE_COLORS['red'], linestyle='--', label='Zero')
     ax1.set_xlabel('Curvature (1/pixels)')
     ax1.set_ylabel('Count')
     ax1.set_title('Curvature Distribution')
@@ -47,64 +75,55 @@ def plot_curvature_distribution(curvature: np.ndarray,
 # ========== Enter Function for 3D Visualisation ==========
 # ========== Enter Function for 3D Plot ==========
 
-def plot_vertice_distribution(vertices: np.ndarray, 
-                              save_path: Optional[str] = None) -> plt.Figure:
+def basic_spatial_plot(mesh, curvature: np.ndarray, 
+                       save_path: Optional[str] = None, 
+                       title: str = "Spatial Curvature Distribution") -> plt.Figure:
     """
-    Plot vertice distribution.
+    Create a simple spatial visualization of curvature.
+    
+    This shows you where high/low curvatures are located.
     
     Parameters:
-        vertices: Array of vertice values
-        save_path: Optional path to save figure
-        
-    Returns:
-        matplotlib Figure object
+    -----------
+    mesh : trimesh object
+        The mesh with face centers
+    curvature : np.ndarray
+        Curvature values for each face
+    
+    Example:
+    --------
+    >>> basic_spatial_plot(analyzer_2d.mesh, analyzer_2d.curvature, "2D Neuron")
     """
+    face_centers = mesh.triangles_center                                          # Each triangle face has a center point (centroid) --> Vertices: (A+B+C)/3
+    
+    fig, ax = plt.subplots(figsize=(10, 8)) 
 
-    # Create visualization grid
-    fig = plt.figure(figsize=(20, 15))
-
-    # 1. 3D Overview (sampled for performance)
-    ax1 = fig.add_subplot(2, 3, 1, projection='3d')
-
-    sample_idx = np.random.choice(len(vertices), min(10000, len(vertices)), replace=False)
-    ax1.scatter(vertices[sample_idx, 0],                                           # --> graps X-coordinates
-            vertices[sample_idx, 1],                                               # ---> graps Y-coordinates
-            vertices[sample_idx, 2],                                               # --> graps Z-coordinates
-            c=vertices[sample_idx, 2],                                             # Color by Z
-            cmap='viridis', s=0.5, alpha=0.6)
-    ax1.set_title('3D Shape Overview (sampled)')
-    ax1.set_xlabel('X'); ax1.set_ylabel('Y'); ax1.set_zlabel('Z')
-
-
-    # 2. Projections (to understand orientation)
-    ax2 = fig.add_subplot(2, 3, 2)                                                 # Subplot on pos. 2 in a 2×3 grid (3D)
-    ax2.scatter(vertices[sample_idx, 0], vertices[sample_idx, 1],                  # Plots only X,Y coordinates, ignoring Z
-                s=0.1, alpha=0.5, c=vertices[sample_idx, 2], cmap='viridis')       # Colors by Z-coordinate (Gives depth perception)
-    ax2.set_aspect('equal')                                                        # Makes 1 pixel in X = 1 pixel in Y visually
-    ax2.set_title('Top View (XY)')
-    ax2.set_xlabel('X'); ax2.set_ylabel('Y')
-
-    # XZ projection
-    ax3 = fig.add_subplot(2, 3, 3)
-    ax3.scatter(vertices[sample_idx, 0], vertices[sample_idx, 2],                  # Plots X,Z coordinates, ignoring Y
-                s=0.1, alpha=0.5, c=vertices[sample_idx, 1], cmap='plasma')        # Colors by Y-coordinate (Gives depth perception)
-    ax3.set_aspect('equal')
-    ax3.set_title('Side View (XZ)')
-    ax3.set_xlabel('X'); ax3.set_ylabel('Z')
-
-    # 4. Vertex density heatmap
-    ax4 = fig.add_subplot(2, 3, 4)
-    H, xedges, yedges = np.histogram2d(vertices[:, 0], vertices[:, 1], bins=50) 
-    ax4.imshow(H.T, origin='lower', cmap='hot', aspect='auto',                      # Displays the counts as a heatmap
-            extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]])
-    ax4.set_title('Vertex Density (XY plane)')
-    ax4.set_xlabel('X'); ax4.set_ylabel('Y')
-    cbar = plt.colorbar(ax4.images[0], ax=ax4)
-    cbar.set_label('Vertex count')
-
+    # Make the color scale symmetric around zero
+    vmax = np.percentile(np.abs(curvature), 95)                                   # Use absolute value
+    vmin = -vmax                                                                  # Make symmetric
+    
+    # Create scatter plot
+    scatter = ax.scatter(face_centers[:, 0], face_centers[:, 1],                  # X coordinates (all rows, column 0) and Y  coordinates (all rows, column 1)
+                        c=curvature, s=0.5, cmap='RdBu',                          # Color each point by its curvature value (s = size each dot)
+                        vmin=vmin, vmax=vmax)                                     # Color scale limits at 5th and 95th percentiles (removes outliers from color scaling)
+    
+    ax.set_xlabel('X position (pixels)')
+    ax.set_ylabel('Y position (pixels)')
+    ax.set_title(title)
+    ax.set_aspect('equal')                                                        # Equal aspect ratio: Ensures 1 pixel in X = 1 pixel in Y. Prevents distortion of the neuron shape
+    
+    # Add colorbar
+    cbar = plt.colorbar(scatter, ax=ax)                                           # Add colorbar: Shows the color-to-curvature mapping. The colorbar is linked to the scatter plot and labeled with units.
+    cbar.set_label('Mean Curvature (1/pixels)')
+    
+    # Add some statistics to the plot
+    stats_text = f'Mean: {np.mean(curvature):.3f}\nStd: {np.std(curvature):.3f}'  # Create statistics text: Formats mean and standard deviation to 3 decimal places
+    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, 
+            va='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    
     plt.tight_layout()
 
     if save_path:
         fig.savefig(save_path, dpi=300, bbox_inches='tight')
 
-    return fig
+    return fig, ax

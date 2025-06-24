@@ -212,7 +212,7 @@ class MeshAnalyzer:
         """Convert pixel units to micrometers."""
         return value * pixel_size
     
-    # ========== MAGIC METHODS (special behavior) ==========
+    # ========== MAGIC METHODS (special behavior) ========== --> Defines the identity of the object when implemented 
     def __str__(self) -> str:
         """String representation for print()."""
         if not self._processed:

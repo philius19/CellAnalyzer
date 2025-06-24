@@ -1,13 +1,13 @@
 from mesh_analysis import MeshAnalyzer
-from mesh_analysis.visualization import plot_curvature_distribution, plot_vertice_distribution
+from mesh_analysis.visualization import basic_spatial_plot, plot_curvature_distribution
 import plotly.graph_objects as go
 import numpy as np
 
 
 surface_path3D = "/Users/philippkaintoch/Documents/Projects/01_Bleb3D/Datensatz/3DPreprocessed/Results/Morphology/Analysis/Mesh/ch1/surface_1_1.mat"
-surface_path2D = "/Users/philippkaintoch/Documents/Projects/01_Bleb3D/Datensatz/02_2DPreprocessed/Results/Morphology/Analysis/Mesh/ch1/surface_1_1.mat"
+surface_path2D = "/Users/philippkaintoch/Documents/Projects/01_Bleb3D/Datensatz/5_BAIAP2_OE/250415_Galic__B2_BAR_2D__04__GPUdecon/Result/Morphology/Analysis/Mesh/ch1/surface_1_1.mat"
 curvature_path3D = "/Users/philippkaintoch/Documents/Projects/01_Bleb3D/Datensatz/3DPreprocessed/Results/Morphology/Analysis/Mesh/ch1/meanCurvature_1_1.mat"
-curvature_path2D = "/Users/philippkaintoch/Documents/Projects/01_Bleb3D/Datensatz/02_2DPreprocessed/Results/Morphology/Analysis/Mesh/ch1/meanCurvature_1_1.mat"
+curvature_path2D = "/Users/philippkaintoch/Documents/Projects/01_Bleb3D/Datensatz/5_BAIAP2_OE/250415_Galic__B2_BAR_2D__04__GPUdecon/Result/Morphology/Analysis/Mesh/ch1/meanCurvature_1_1.mat"
 
 
 analyzer3D = MeshAnalyzer(surface_path3D, curvature_path3D)
@@ -25,7 +25,7 @@ curv2D = analyzer2D.curvature
 
 mesh = analyzer2D.mesh
 
-print(analyzer3D.physical_dimensions)
+print(len(analyzer3D.curvature), len(analyzer3D.faces))
 
 
 
@@ -34,5 +34,5 @@ print(analyzer3D.physical_dimensions)
 #plot_curvature_distribution(curv3D, "/Users/philippkaintoch/Desktop/3D.png")
 #plot_curvature_distribution(curv2D, "/Users/philippkaintoch/Desktop/2D.png")
 
-#plot_vertice_distribution(analyzer3D.vertices, "/Users/philippkaintoch/Desktop/3D_Pl.png")
-#plot_vertice_distribution(analyzer2D.vertices, "/Users/philippkaintoch/Desktop/2D_Pl.png")
+basic_spatial_plot(analyzer3D.mesh, analyzer3D.curvature, "/Users/philippkaintoch/Desktop/3D_Pl.png")
+basic_spatial_plot(analyzer2D.mesh, analyzer2D.curvature, "/Users/philippkaintoch/Desktop/2D_Pl.png")
