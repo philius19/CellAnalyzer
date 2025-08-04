@@ -37,8 +37,8 @@ function ThreeLevelSegmentation_Preprocessing_Script()
 %  run the entire script or execute sections individually to understand
 %  how each processing step affects your images.
 %
-%  AUTHOR: Created for 3D Cell Morphology Analysis
-%  DATE: 2025
+%  AUTHOR: Philipp Kaintoch 
+%  DATE: 27.07.2025
 %
 %% ========================================================================
 
@@ -48,14 +48,14 @@ function ThreeLevelSegmentation_Preprocessing_Script()
 
 % *** MODIFY THESE PATHS FOR YOUR SPECIFIC DATA ***
 % Input directory containing your 3D TIFF images
-imageDirectory = '/Users/philippkaintoch/Documents/Projects/01_Bleb3D/Datensatz/3D_Lightsheet/1_shortMovie_BAIAP2_OE/ch1t0';
+imageDirectory = '/Volumes/T7/Images_Tim/Segment';
 
 % Output directory where all results will be saved
 outputBaseDirectory = '/Users/philippkaintoch/Desktop/Results';
 
 % Imaging parameters - MODIFY THESE FOR YOUR MICROSCOPE SETTINGS
-pixelSizeXY = 103;          % Pixel size in XY plane (nanometers)
-pixelSizeZ = 205.8;         % Pixel size in Z direction (nanometers)
+pixelSizeXY = 166.1;          % Pixel size in XY plane (nanometers)
+pixelSizeZ = 500;         % Pixel size in Z direction (nanometers)
 timeInterval = 1;           % Time interval (seconds) - use 1 for single timepoint
 
 % Processing parameters - ADVANCED USERS CAN MODIFY THESE

@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Optional, Dict
 
 import numpy as np
-import trimesh
+import vedo
 
 
 from .io import load_surface_data, load_curvature_data, validate_file_paths
@@ -36,7 +36,7 @@ class MeshAnalyzer:
     SUPPORTED_FORMATS = ['.mat', '.h5']
 
     DEFAULT_PIXEL_SIZE_XY = 0.1  # micrometers
-    DEFAULT_PIXEL_SIZE_Z = 0.2   # micrometers
+    DEFAULT_PIXEL_SIZE_Z = 0.1   # micrometers
 
     def __init__(self, surface_path:str, curvature_path: str,
                  pixel_size_xy: float = None, pixel_size_z: float = None):
@@ -69,7 +69,7 @@ class MeshAnalyzer:
          # Initialize data containers (None until loaded) - Optional is a type hint (array or None)
         self.vertices: Optional[np.ndarray] = None
         self.faces: Optional[np.ndarray] = None
-        self.mesh: Optional[trimesh.Trimesh] = None
+        self.mesh: Optional[vedo.Mesh] = None
         self.curvature: Optional[np.ndarray] = None
 
         # Private attributes (convention: prefix with _)
@@ -100,10 +100,10 @@ class MeshAnalyzer:
             self.vertices, self.faces, self.mesh = load_surface_data(self.surface_path)
 
             # Fix mesh orientation if needed
-            if self.mesh.volume < 0:
+            if self.mesh.volume() < 0:
                 if verbose:
                     print("Fixing inverted mesh...")
-                self.mesh.invert()
+                self.mesh.reverse()
 
             # Load curvature
             if verbose:
@@ -115,7 +115,7 @@ class MeshAnalyzer:
 
             if verbose:
                 print(f"✓ Loaded {len(self.vertices)} vertices, {len(self.faces)} faces")
-                print(f"✓ Mesh volume: {self.mesh.volume} pixels³")
+                print(f"✓ Mesh volume: {self.mesh.volume()} pixels³")
 
         except Exception as e:
             raise RuntimeError(f"Failed to load data: {str(e)}")
@@ -141,14 +141,14 @@ class MeshAnalyzer:
             'mesh': {
                 'n_vertices': len(self.vertices),
                 'n_faces': len(self.faces),
-                'n_edges': len(self.mesh.edges_unique),
-                'volume_pixels3': float(self.mesh.volume),
-                'volume_um3': float(self.mesh.volume * 
+                'n_edges': len(self.mesh.edges),
+                'volume_pixels3': float(self.mesh.volume()),
+                'volume_um3': float(self.mesh.volume() * 
                                    self.pixel_size_xy**2 * self.pixel_size_z),
-                'surface_area_pixels2': float(self.mesh.area),
-                'surface_area_um2': float(self.mesh.area * self.pixel_size_xy**2),
-                'is_watertight': self.mesh.is_watertight,
-                'euler_number': self.mesh.euler_number
+                'surface_area_pixels2': float(self.mesh.area()),
+                'surface_area_um2': float(self.mesh.area() * self.pixel_size_xy**2),
+                'is_watertight': self.mesh.is_closed(),
+                'euler_number': self.mesh.euler_characteristic()
             },
             'curvature': {
                 'mean': float(np.mean(self.curvature)),
@@ -183,11 +183,11 @@ class MeshAnalyzer:
         if not self._processed:
             return {}
     
-        bounds = self.mesh.bounds
+        bounds = self.mesh.bounds()
         return {
-            'x_um': (bounds[1][0] - bounds[0][0]) * self.pixel_size_xy,
-            'y_um': (bounds[1][1] - bounds[0][1]) * self.pixel_size_xy,
-            'z_um': (bounds[1][2] - bounds[0][2]) * self.pixel_size_z
+            'x_um': (bounds[1] - bounds[0]) * self.pixel_size_xy,
+            'y_um': (bounds[3] - bounds[2]) * self.pixel_size_xy,
+            'z_um': (bounds[5] - bounds[4]) * self.pixel_size_z
         }
     
     # ========== CLASS METHODS (don't need instance) ==========

@@ -1,6 +1,6 @@
 from mat73 import loadmat
 from pathlib import Path
-import trimesh
+import vedo
 from typing import Tuple, List
 import numpy as np
 import json
@@ -29,7 +29,7 @@ def validate_file_paths(surface_path: Path, curvature_path: Path,
             )
 
 
-def load_surface_data(filepath: Path) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def load_surface_data(filepath: Path) -> Tuple[np.ndarray, np.ndarray, vedo.Mesh]:
     """
     Load surface mesh data from .mat file.
     
@@ -41,7 +41,7 @@ def load_surface_data(filepath: Path) -> Tuple[np.ndarray, np.ndarray, np.ndarra
     
     vertices = np.array(surface['vertices'], dtype=np.float32)
     faces = np.array(surface['faces'], dtype=np.int32) - 1  # Convert to 0-based
-    mesh = trimesh.Trimesh(vertices = vertices, faces = faces)
+    mesh = vedo.Mesh([vertices, faces])
     
     return vertices, faces, mesh
 
