@@ -85,7 +85,7 @@ def basic_spatial_plot(mesh, curvature: np.ndarray,
     
     Parameters:
     -----------
-    mesh : trimesh object
+    mesh : vedo.Mesh object
         The mesh with face centers
     curvature : np.ndarray
         Curvature values for each face
@@ -94,7 +94,10 @@ def basic_spatial_plot(mesh, curvature: np.ndarray,
     --------
     >>> basic_spatial_plot(analyzer_2d.mesh, analyzer_2d.curvature, "2D Neuron")
     """
-    face_centers = mesh.triangles_center                                          # Each triangle face has a center point (centroid) --> Vertices: (A+B+C)/3
+    # Calculate face centers manually for vedo mesh
+    vertices = mesh.vertices
+    faces = mesh.cells
+    face_centers = np.array([np.mean(vertices[face], axis=0) for face in faces])
     
     fig, ax = plt.subplots(figsize=(10, 8)) 
 

@@ -7,6 +7,7 @@ import vedo
 
 from .io import load_surface_data, load_curvature_data, validate_file_paths
 from .utils import calculate_mesh_quality_metrics
+from .datatypes import AnalysisResults, MeshStatistics, CurvatureStatistics
 
 class MeshAnalyzer:
     """
@@ -76,12 +77,8 @@ class MeshAnalyzer:
         self._processed = False           
         self._statistics_cache = {}
 
-        # Analysis results storage
-        self.results = {
-            'statistics': {},
-            'visualizations': {},
-            'quality_metrics': {}
-        }
+        # Analysis results storage using dataclass
+        self.results = AnalysisResults()
 
         # ========== PRIVATE METHODS (internal use) ==========
     def _validate_inputs(self):
@@ -120,7 +117,7 @@ class MeshAnalyzer:
         except Exception as e:
             raise RuntimeError(f"Failed to load data: {str(e)}")
 
-    def calculate_statistics(self, force_recalculate: bool = False) -> Dict:
+    def calculate_statistics(self, force_recalculate: bool = False) -> AnalysisResults:
         """
         Calculate comprehensive mesh and curvature statistics.
         
@@ -128,48 +125,56 @@ class MeshAnalyzer:
             force_recalculate: Recalculate even if cached
             
         Returns:
-            Dictionary containing all statistics
+            AnalysisResults dataclass containing all statistics
         """
         if not self._processed:
             raise RuntimeError("Must load data first. Call load_data()")
         
         # Check cache - avoid expensive recalculations
-        if 'basic_stats' in self._statistics_cache and not force_recalculate:
-            return self._statistics_cache['basic_stats']
+        if self.results.is_complete() and not force_recalculate:
+            return self.results
         
-        stats = {
-            'mesh': {
-                'n_vertices': len(self.vertices),
-                'n_faces': len(self.faces),
-                'n_edges': len(self.mesh.edges),
-                'volume_pixels3': float(self.mesh.volume()),
-                'volume_um3': float(self.mesh.volume() * 
-                                   self.pixel_size_xy**2 * self.pixel_size_z),
-                'surface_area_pixels2': float(self.mesh.area()),
-                'surface_area_um2': float(self.mesh.area() * self.pixel_size_xy**2),
-                'is_watertight': self.mesh.is_closed(),
-                'euler_number': self.mesh.euler_characteristic()
-            },
-            'curvature': {
-                'mean': float(np.mean(self.curvature)),
-                'std': float(np.std(self.curvature)),
-                'sem': float(np.std(self.curvature) / np.sqrt(len(self.curvature))),
-                'median': float(np.median(self.curvature)),
-                'min': float(np.min(self.curvature)),
-                'max': float(np.max(self.curvature)),
-                'percentiles': {
-                    p: float(np.percentile(self.curvature, p))
-                    for p in [1, 5, 25, 50, 75, 95, 99]
-                }
-            },
-            'quality': calculate_mesh_quality_metrics(self.mesh)
+        # Calculate mesh statistics
+        self.results.mesh_stats = MeshStatistics(
+            n_vertices=len(self.vertices),
+            n_faces=len(self.faces),
+            n_edges=len(self.mesh.edges),
+            volume_pixels3=float(self.mesh.volume()),
+            volume_um3=float(self.mesh.volume() * 
+                           self.pixel_size_xy**2 * self.pixel_size_z),
+            surface_area_pixels2=float(self.mesh.area()),
+            surface_area_um2=float(self.mesh.area() * self.pixel_size_xy**2),
+            is_watertight=self.mesh.is_closed(),
+            euler_number=self.mesh.euler_characteristic()
+        )
+        
+        # Calculate curvature statistics
+        self.results.curvature_stats = CurvatureStatistics.from_array(self.curvature)
+        
+        # Calculate quality metrics
+        self.results.quality_metrics = calculate_mesh_quality_metrics(self.mesh)
+        
+        # For backwards compatibility, also store as dict
+        self._statistics_cache['basic_stats'] = {
+            'mesh': self.results.mesh_stats.to_dict(),
+            'curvature': self.results.curvature_stats.__dict__,
+            'quality': self.results.quality_metrics.__dict__
         }
-
-        # Cache results
-        self._statistics_cache['basic_stats'] = stats
-        self.results['statistics'] = stats
-
-        return stats
+        
+        return self.results
+    
+    def calculate_statistics_dict(self, force_recalculate: bool = False) -> Dict:
+        """
+        Legacy method that returns statistics as dictionary.
+        
+        Use calculate_statistics() for new code to get dataclass results.
+        """
+        results = self.calculate_statistics(force_recalculate)
+        return {
+            'mesh': results.mesh_stats.to_dict() if results.mesh_stats else {},
+            'curvature': results.curvature_stats.__dict__ if results.curvature_stats else {},
+            'quality': results.quality_metrics.__dict__ if results.quality_metrics else {}
+        }
     
     # ========== PROPERTY METHODS (only runs when accessed f.e. analyzer.is_loaded) ==========
     @property 
