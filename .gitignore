@@ -1,2 +1,3 @@
 *.ipynb
 CLAUDE.md
+.claude/
