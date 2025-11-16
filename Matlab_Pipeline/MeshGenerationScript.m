@@ -18,8 +18,8 @@ function MeshGenerationScript()
 % Date: 2025-08-05, Version 1.0 
 
 %% Set directories
-imageDirectory = '/Volumes/T7/Images_Tim/Segment';
-saveDirectory = '/Users/philippkaintoch/Desktop/Results';
+imageDirectory = '/Volumes/T7/Spinning Disc/2025_11_11_Neutro/Decon/01';
+saveDirectory = '/Users/philippkaintoch/Desktop/MIPs/01';
 
 %% Set Image Metadata 
 pixelSizeXY = 166.1; % nm
@@ -30,8 +30,8 @@ timeInterval = 1;
 p.control.resetMD = 0; 
 p.control.deconvolution = 0;         p.control.deconvolutionReset = 0;
 p.control.computeMIP = 1;            p.control.computeMIPReset = 0;
-p.control.mesh = 1;                  p.control.meshReset = 0;
-p.control.meshThres = 1;             p.control.meshThresReset = 0;
+p.control.mesh = 0;                  p.control.meshReset = 0;
+p.control.meshThres = 0;             p.control.meshThresReset = 0;
 p.control.surfaceSegment = 0;        p.control.surfaceSegmentReset = 0;
 p.control.patchDescribeForMerge = 0; p.control.patchDescribeForMergeReset = 0;
 p.control.patchMerge = 0;            p.control.patchMergeReset = 0;

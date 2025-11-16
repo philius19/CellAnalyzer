@@ -37,8 +37,8 @@ NATURE_COLORS = {
 
 ##################################################################################################################################
 
-root = Path("/Users/philippkaintoch/Documents/Projects/01_Bleb3D/Analyze/2D/5_BAIAP2_OE")
-mesh_dir = Path("Morphology/Analysis/Mesh/ch1")
+root = Path("/Volumes/T7/Analysis/25_10_01_Batch2/Models/LA_GFP")
+mesh_dir = Path("/Volumes/T7/Analysis/25_10_01_Batch2/Models/LA_GFP/Morphology/Analysis/Mesh/ch1")
 
 surface_path = root / mesh_dir / "surface_1_1.mat"
 curvature_path = root / mesh_dir / "meanCurvature_1_1.mat"
@@ -309,7 +309,7 @@ def create_individual_components_from_analyzer(analyzer, shannon_entropy,
 create_individual_components_from_analyzer(
     analyzer_3d,
     calculate_curvature_entropy(analyzer_3d.curvature / analyzer_3d.pixel_size_xy),  # Convert for entropy
-    output_dir='/Users/philippkaintoch/Desktop/Results/Components',
+    output_dir='/Users/philippkaintoch/Desktop/Results',
     dpi=500
 )
 
