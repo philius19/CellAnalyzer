@@ -1,4 +1,5 @@
-from mat73 import loadmat
+from mat73 import loadmat as loadmat_v73
+import scipy.io as sio
 from pathlib import Path
 import vedo
 from typing import Tuple, List
@@ -6,8 +7,29 @@ import numpy as np
 import json
 
 """
-File input/output operations for mesh analysis. Maybe rework to store all of the data in one single Library? 
+File input/output operations for mesh analysis. Maybe rework to store all of the data in one single Library?
 """
+
+
+def loadmat(filepath: str) -> dict:
+    """
+    Load MATLAB file, automatically handling both v7.3 (HDF5) and older formats.
+
+    Parameters:
+        filepath: Path to .mat file
+
+    Returns:
+        Dictionary containing MATLAB variables
+
+    Raises:
+        OSError: If file cannot be read
+    """
+    try:
+        # Try MATLAB 7.3 format first (mat73)
+        return loadmat_v73(filepath)
+    except (TypeError, OSError):
+        # Fall back to older format (scipy.io)
+        return sio.loadmat(filepath, struct_as_record=False, squeeze_me=True)
 
 def validate_file_paths(surface_path: Path, curvature_path: Path, 
                        supported_formats: List[str]) -> None:
@@ -32,17 +54,27 @@ def validate_file_paths(surface_path: Path, curvature_path: Path,
 def load_surface_data(filepath: Path) -> Tuple[np.ndarray, np.ndarray, vedo.Mesh]:
     """
     Load surface mesh data from .mat file.
-    
+
+    Handles both MATLAB v7.3 (dict-like) and older formats (mat_struct).
+
     Returns:
         Tuple of (vertices, faces, mesh)
     """
     surface_data = loadmat(str(filepath))
     surface = surface_data['surface']
-    
-    vertices = np.array(surface['vertices'], dtype=np.float32)
-    faces = np.array(surface['faces'], dtype=np.int32) - 1  # Convert to 0-based
+
+    # Handle both dict-like (mat73) and struct-like (scipy.io) access
+    if isinstance(surface, dict):
+        # MATLAB v7.3 format (mat73)
+        vertices = np.array(surface['vertices'], dtype=np.float32)
+        faces = np.array(surface['faces'], dtype=np.int32) - 1  # Convert to 0-based
+    else:
+        # Older MATLAB format (scipy.io mat_struct)
+        vertices = np.array(surface.vertices, dtype=np.float32)
+        faces = np.array(surface.faces, dtype=np.int32) - 1  # Convert to 0-based
+
     mesh = vedo.Mesh([vertices, faces])
-    
+
     return vertices, faces, mesh
 
 

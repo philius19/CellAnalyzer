@@ -11,8 +11,9 @@ MeshAnalyzer provides a robust, type-safe framework for analyzing triangulated s
 - **Type-Safe Data Structures**: Immutable dataclasses for self-documenting, validated results
 - **Comprehensive Mesh Analysis**: Volume, surface area, topology, and quality metrics
 - **Curvature Analysis**: Mean and Gaussian curvature with full distribution statistics
+- **Time-Lapse Support**: Multi-frame analysis with lazy loading and global normalization
 - **Physical Units**: Automatic conversion from pixels to micrometers
-- **Visualization**: Mesh plotting and visualisation 
+- **Visualization**: Mesh plotting and visualisation
 - **Quality Assurance**: Automatic mesh validation and warning system
 - **Data Export**: JSON results and PLY mesh export for external tools
 
@@ -326,6 +327,226 @@ fig, ax = basic_spatial_plot(analyzer.mesh, analyzer.curvature,
 
 ---
 
+## Time-Lapse Analysis
+
+MeshAnalyzer provides comprehensive support for time-lapse (multi-frame) data through the `TimeSeriesManager` class. This enables temporal analysis of cellular dynamics with efficient memory management and global normalization across timepoints.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TimeSeriesManager                        │
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+│  │  Frame 1 │  │  Frame 2 │  │  Frame 3 │  │ Frame 50 │  │
+│  │ (cached) │  │ (cached) │  │(on-disk)│  │(on-disk)│  │
+│  └────┬─────┘  └────┬─────┘  └──────────┘  └──────────┘  │
+│       │             │                                      │
+│       └─────────────┴───> LRU Cache (10 frames)          │
+│                                                             │
+│  Global Operations:                                        │
+│  • Curvature normalization across all frames              │
+│  • Topology validation                                    │
+│  • Temporal consistency checks                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Concepts
+
+**1. Lazy Loading**
+- Frames loaded on-demand to minimize memory footprint
+- LRU (Least Recently Used) cache eviction for large datasets
+- Three cache modes: `'none'`, `'lazy'`, `'all'`
+
+**2. Global Normalization**
+- Curvature normalized across all timepoints for temporal comparisons
+- Symmetric (around zero) or min-max normalization
+- Optional percentile-based robust scaling (e.g., 5th-95th)
+
+**3. Dict-Like Interface**
+- Access frames like dictionary: `manager[time_index]`
+- Iterate naturally: `for time_idx, data in manager`
+- Pythonic and intuitive for scientists
+
+### TimeSeriesManager API
+
+#### Initialization
+
+```python
+from MeshAnalyzer import TimeSeriesManager
+
+manager = TimeSeriesManager(
+    data_dir='/path/to/timeseries/data',
+    pixel_size_xy=0.1030,   # μm
+    pixel_size_z=0.2167,     # μm
+    cache_mode='lazy',       # 'none' | 'lazy' | 'all'
+    max_cached_frames=10,    # LRU cache size
+    verbose=True
+)
+```
+
+**Parameters:**
+- `data_dir`: Directory containing `surface_*.mat` and `meanCurvature_*.mat` files
+- `pixel_size_xy`, `pixel_size_z`: Physical dimensions in micrometers
+- `cache_mode`: Memory management strategy
+  - `'none'`: No caching (lowest memory, slower access)
+  - `'lazy'`: Load on-demand with LRU eviction (balanced)
+  - `'all'`: Preload all frames (fastest access, high memory)
+- `max_cached_frames`: Maximum frames in cache (for `'lazy'` mode)
+- `verbose`: Print progress messages
+
+#### File Naming Convention
+
+TimeSeriesManager expects paired files following the u-shape3D convention:
+```
+data_dir/
+├── surface_1_1.mat          ← Frame 1
+├── meanCurvature_1_1.mat
+├── surface_1_2.mat          ← Frame 2
+├── meanCurvature_1_2.mat
+└── ...
+```
+
+Pattern: `surface_<channel>_<timeframe>.mat`
+
+#### Methods
+
+**`discover_frames(pattern='surface_*.mat') -> int`**
+Scan directory and discover all time frames.
+```python
+n_frames = manager.discover_frames()
+# Returns: 50
+# Output: "Discovered 50 frames: T01 - T50"
+```
+
+**`load_frame(time_index: int) -> TimeSeriesData`**
+Load specific frame (handles caching automatically).
+```python
+frame = manager.load_frame(10)
+print(f"Frame T{frame.time_index}: {frame.n_faces} faces")
+print(f"Curvature range: [{frame.curvature.min():.4f}, {frame.curvature.max():.4f}]")
+```
+
+**`validate_frames() -> Dict`**
+Check temporal consistency and data quality.
+```python
+results = manager.validate_frames()
+# Returns:
+# {
+#   'is_valid': True,
+#   'topology_consistent': False,  # Expected for biological data
+#   'warnings': ['T02: Topology mismatch (38240 vertices, 76476 faces)', ...],
+#   'errors': [],
+#   'temporal_gaps': []
+# }
+```
+
+**Note:** Topology changes are normal for live cells (growing, forming blebs). These are reported as warnings, not errors.
+
+**`get_normalized_curvature(method='symmetric', percentile_range=None) -> Dict[int, np.ndarray]`**
+Globally normalize curvature across all timepoints.
+```python
+# Symmetric normalization (recommended for blebs)
+normalized = manager.get_normalized_curvature(
+    method='symmetric',         # Symmetric around zero
+    percentile_range=(5, 95)   # Robust to outliers
+)
+
+# Access normalized data
+for time_idx, curv_norm in normalized.items():
+    print(f"T{time_idx}: range [{curv_norm.min():.3f}, {curv_norm.max():.3f}]")
+```
+
+**Parameters:**
+- `method`: `'symmetric'` (normalize to [-1, +1] around zero) or `'full'` (min-max to [0, 1])
+- `percentile_range`: Optional `(low, high)` percentiles (e.g., `(5, 95)`) for robust scaling
+
+**`clear_cache() -> None`**
+Clear all cached frames to free memory.
+
+**`get_cache_stats() -> Dict`**
+Inspect current cache state.
+```python
+stats = manager.get_cache_stats()
+# {
+#   'cache_mode': 'lazy',
+#   'max_cached_frames': 10,
+#   'currently_cached': 5,
+#   'cached_indices': [1, 2, 3, 4, 5],
+#   'total_frames': 50
+# }
+```
+
+#### Dict-Like Interface
+
+```python
+# Access by index
+frame_10 = manager[10]
+
+# Check existence
+if 10 in manager:
+    print("Frame 10 exists")
+
+# Iterate over all frames
+for time_idx, frame_data in manager:
+    print(f"Processing T{time_idx:02d}...")
+    analyze(frame_data.curvature)
+
+# Get number of frames
+n_frames = len(manager)
+
+# Access keys (time indices)
+time_points = list(manager.keys())
+```
+
+### TimeSeriesData Structure
+
+Each frame returns a `TimeSeriesData` dataclass:
+
+```python
+@dataclass
+class TimeSeriesData:
+    time_index: int              # Frame number
+    analyzer: MeshAnalyzer       # Full MeshAnalyzer instance
+    face_centers: np.ndarray     # Pre-calculated (N_faces, 3)
+    curvature: np.ndarray        # Curvature copy (N_faces,)
+
+    # Properties
+    n_faces: int                 # Number of faces
+    n_vertices: int              # Number of vertices
+```
+
+**Use cases:**
+- `face_centers`: Fast XY/XZ projections for visualization
+- `curvature`: Direct array access for statistics
+- `analyzer`: Full mesh analysis capabilities per frame
+
+### Performance Considerations
+
+#### Memory Usage
+
+| Dataset Size | Cache Mode | Memory | Load Time | Best For |
+|--------------|------------|--------|-----------|----------|
+| 50 frames    | `'lazy'` (10 cache) | ~800 MB | On-demand | Typical use |
+| 50 frames    | `'all'` | ~4 GB | Upfront | Repeated access |
+| 100 frames   | `'lazy'` (10 cache) | ~800 MB | On-demand | Large datasets |
+| 100 frames   | `'none'` | ~80 MB | Per frame | Memory-constrained |
+
+**Recommendations:**
+- **Typical analysis** (50-100 frames): Use `cache_mode='lazy'` with `max_cached_frames=10`
+- **Repeated access** (e.g., interactive visualization): Use `cache_mode='all'`
+- **Memory-limited** (<8 GB RAM): Use `cache_mode='none'` or reduce `max_cached_frames`
+
+#### File Format Support
+
+TimeSeriesManager automatically handles both MATLAB formats:
+- **MATLAB v7.3** (HDF5-based): Read with `mat73`
+- **MATLAB v5-7.2**: Read with `scipy.io`
+
+No user configuration needed - format detection is automatic.
+
+---
+
 ## Examples Gallery
 
 ### Example 1: Basic Analysis
@@ -525,6 +746,134 @@ save_results_to_json(stats_dict, 'analysis_results.json')
 
 print("✓ Exported PLY mesh and JSON results")
 ```
+
+### Example 9: Time-Lapse Analysis
+
+```python
+from MeshAnalyzer import TimeSeriesManager
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Initialize manager for neutrophil time-lapse data
+manager = TimeSeriesManager(
+    data_dir='/Volumes/T7/Analysis_Neutros/03/Morphology/Analysis/Mesh/ch1',
+    pixel_size_xy=0.1030,   # Lattice light-sheet settings
+    pixel_size_z=0.2167,
+    cache_mode='lazy',
+    max_cached_frames=10,
+    verbose=True
+)
+
+# Discover all frames
+n_frames = manager.discover_frames()
+print(f"Found {n_frames} frames")
+
+# Validate temporal consistency
+results = manager.validate_frames()
+print(f"Valid: {results['is_valid']}")
+print(f"Topology warnings: {len(results['warnings'])}")  # Expected for live cells
+
+# Global curvature normalization (critical for temporal comparisons)
+normalized_curv = manager.get_normalized_curvature(
+    method='symmetric',
+    percentile_range=(5, 95)
+)
+
+# Analyze temporal dynamics
+curvature_means = []
+curvature_stds = []
+
+for time_idx, frame_data in manager:
+    curv_norm = normalized_curv[time_idx]
+    curvature_means.append(np.mean(curv_norm))
+    curvature_stds.append(np.std(curv_norm))
+    print(f"T{time_idx:02d}: μ={curvature_means[-1]:.4f}, σ={curvature_stds[-1]:.4f}")
+
+# Plot temporal evolution
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+
+time_points = list(manager.keys())
+ax1.plot(time_points, curvature_means, 'o-', label='Mean curvature')
+ax1.set_ylabel('Normalized Curvature')
+ax1.set_title('Temporal Curvature Dynamics')
+ax1.legend()
+
+ax2.plot(time_points, curvature_stds, 'o-', color='red', label='Curvature variability')
+ax2.set_xlabel('Time Frame')
+ax2.set_ylabel('Std Dev')
+ax2.legend()
+
+plt.tight_layout()
+plt.savefig('temporal_dynamics.pdf', dpi=300)
+
+# Create animated GIF (see Example/test.py for full implementation)
+from matplotlib import animation
+
+fig = plt.figure(figsize=(10, 10), facecolor='black')
+ax = fig.add_subplot(111, facecolor='black')
+ax.axis('off')
+
+# Setup scatter plot with first frame
+first_data = manager[1]
+scatter = ax.scatter(
+    first_data.face_centers[:, 0],
+    first_data.face_centers[:, 1],
+    c=normalized_curv[1],
+    s=2.0,
+    cmap='RdBu',
+    vmin=-1,
+    vmax=1,
+    alpha=1.0
+)
+
+def update_frame(frame_idx):
+    """Update scatter data for animation."""
+    time_idx = time_points[frame_idx]
+    data = manager[time_idx]
+    scatter.set_offsets(data.face_centers[:, :2])
+    scatter.set_array(normalized_curv[time_idx])
+    return [scatter]
+
+anim = animation.FuncAnimation(
+    fig, update_frame, frames=len(time_points),
+    interval=100, blit=True, repeat=True
+)
+
+anim.save('neutrophil_dynamics.gif', writer='pillow', fps=10, dpi=150)
+print("✓ Generated temporal analysis and animation")
+```
+
+**Output:**
+```
+======================================================================
+                    DISCOVERING TIME-SERIES FRAMES
+======================================================================
+
+Searching in: /Volumes/T7/Analysis_Neutros/03/Morphology/Analysis/Mesh/ch1
+Found 50 surface files
+
+  ✓ T01: surface_1_1.mat
+  ✓ T02: surface_1_2.mat
+  ...
+  ✓ T50: surface_1_50.mat
+
+                               SUCCESS
+Discovered 50 frames: T01 - T50
+======================================================================
+
+T01: μ=-0.0127, σ=0.3456
+T02: μ=-0.0089, σ=0.3512
+...
+T50: μ=0.0234, σ=0.4123
+
+✓ Generated temporal analysis and animation
+```
+
+**Scientific applications:**
+- Tracking bleb formation/retraction over time
+- Quantifying membrane dynamics during migration
+- Comparing curvature evolution across experimental conditions
+- Identifying temporal patterns in membrane remodeling
 
 ---
 

@@ -1,4 +1,55 @@
+# Ignore everything by default
+*
+*/
+
+# Include installation and documentation files
+!.gitignore
+!README.md
+!pyproject.toml
+!MANIFEST.in
+
+# Include assets directory for documentation media
+!assets/
+!assets/**
+
+# Include MeshAnalyzer package
+!MeshAnalyzer/
+!MeshAnalyzer/**
+
+# Exclude Python cache files (even within MeshAnalyzer)
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/*.so
+**/*.egg
+**/*.egg-info/
+**/dist/
+**/build/
+**/*.whl
+
+# Exclude IDE and editor files
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/*~
+
+# Exclude OS files
+**/.DS_Store
+**/Thumbs.db
+
+# Exclude test coverage and pytest cache
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+**/.tox/
+
+# Exclude Jupyter checkpoints
+**/*.ipynb_checkpoints/
+
+# Exclude specific files from original .gitignore
 *.ipynb
 CLAUDE.md
 .claude/
-

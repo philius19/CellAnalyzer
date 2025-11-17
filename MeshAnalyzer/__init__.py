@@ -7,18 +7,26 @@ from .visualization import plot_curvature_distribution, basic_spatial_plot
 from .io import load_surface_data, load_curvature_data
 from .utils import convert_pixels_to_um
 from .datatypes import (
-    AnalysisResults, 
-    MeshStatistics, 
-    CurvatureStatistics, 
+    AnalysisResults,
+    MeshStatistics,
+    CurvatureStatistics,
     QualityMetrics
 )
+from .timeseries import (
+    TimeSeriesManager,
+    TimeFrameInfo,
+    TimeSeriesData
+)
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = [
     'MeshAnalyzer',
     'AnalysisResults',
-    'MeshStatistics', 
+    'MeshStatistics',
     'CurvatureStatistics',
-    'QualityMetrics'
+    'QualityMetrics',
+    'TimeSeriesManager',
+    'TimeFrameInfo',
+    'TimeSeriesData'
 ]
 
