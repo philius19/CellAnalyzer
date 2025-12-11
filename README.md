@@ -310,7 +310,7 @@ If MeshAnalyzer supports your research:
   author={Kaintoch, Philipp},
   year={2025},
   version={1.2.0},
-  url={https://github.com/your-org/MeshAnalyzer}
+  url={https://github.com/philius19/MeshAnalyzer}
 }
 ```
 
