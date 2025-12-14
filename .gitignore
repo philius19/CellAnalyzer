@@ -12,11 +12,11 @@
 !assets/
 !assets/**
 
-# Include MeshAnalyzer package
-!MeshAnalyzer/
-!MeshAnalyzer/**
+# Include CellAnalyzer package
+!CellAnalyzer/
+!CellAnalyzer/**
 
-# Exclude Python cache files (even within MeshAnalyzer)
+# Exclude Python cache files (even within CellAnalyzer)
 **/__pycache__/
 **/*.pyc
 **/*.pyo

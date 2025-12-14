@@ -1,10 +1,18 @@
-"""Utility functions for mesh analysis."""
+"""Statistical analysis functions for mesh data."""
 from pathlib import Path
 from typing import Dict, Tuple
 import numpy as np
 import vedo
 
-from .datatypes import QualityMetrics
+from .datatypes import (
+    QualityMetrics,
+    MeshFrame,
+    MeshStatistics,
+    CurvatureStatistics,
+    AnalysisResults,
+    DEFAULT_PIXEL_SIZE_XY_UM,
+    DEFAULT_PIXEL_SIZE_Z_UM
+)
 
 
 def convert_pixels_to_um(value: float, pixel_size: float) -> float:
@@ -82,6 +90,46 @@ def calculate_mesh_quality_metrics(mesh: vedo.Mesh) -> QualityMetrics:
         aspect_ratio_std=float(aspect_ratios.std())
     )
 
+
+def calculate_mesh_statistics(frame: MeshFrame) -> MeshStatistics:
+    """
+    Calculate mesh geometry statistics from MeshFrame.
+
+    Pure function: Computes volume, surface area, topology from mesh data.
+    Uses pixel_size_xy for BOTH XY and Z (mesh is isotropic after MATLAB resampling).
+    """
+    mesh = frame.mesh
+    pixel_size_xy = frame.pixel_size_xy_um or DEFAULT_PIXEL_SIZE_XY_UM
+
+    return MeshStatistics(
+        n_vertices=frame.n_vertices,
+        n_faces=frame.n_faces,
+        n_edges=len(mesh.edges),
+        volume_pixels3=float(mesh.volume()),
+        volume_um3=float(mesh.volume() * pixel_size_xy**3),  # CORRECT: mesh is isotropic
+        surface_area_pixels2=float(mesh.area()),
+        surface_area_um2=float(mesh.area() * pixel_size_xy**2),
+        is_watertight=mesh.is_closed(),
+        euler_number=mesh.euler_characteristic()
+    )
+
+
+def calculate_curvature_statistics(frame: MeshFrame) -> CurvatureStatistics:
+    """Calculate curvature statistics from MeshFrame."""
+    return CurvatureStatistics.from_array(frame.curvature)
+
+
+def calculate_frame_statistics(frame: MeshFrame) -> AnalysisResults:
+    """
+    Calculate complete statistics for a MeshFrame.
+
+    Combines mesh, curvature, and quality metrics into single result.
+    """
+    return AnalysisResults(
+        mesh_stats=calculate_mesh_statistics(frame),
+        curvature_stats=calculate_curvature_statistics(frame),
+        quality_metrics=calculate_mesh_quality_metrics(frame.mesh)
+    )
 
 
 def calculate_surface_roughness(curvature: np.ndarray) -> float:

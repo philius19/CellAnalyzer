@@ -2,8 +2,9 @@
 Data structures for mesh analysis results.
 """
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Union, List
+from typing import Dict, Optional, Union, List, Iterator, Tuple
 from datetime import datetime
+from pathlib import Path
 import numpy as np
 
 
@@ -194,7 +195,7 @@ class AuxiliaryMeshData:
 class MeshFrame:
     """Complete mesh data for a single timepoint.
 
-    Unified data container that replaces MeshAnalyzer for data storage.
+    Unified data container for single timepoint mesh data.
     Includes lazy-computed properties to avoid redundant calculations.
     """
     vertices: np.ndarray
@@ -237,3 +238,40 @@ class MeshFrame:
         if self.metadata:
             return self.metadata.pixel_size_z_nm / 1000.0
         return None
+
+
+@dataclass
+class CellData:
+    """Complete cell dataset - container for all frames and metadata."""
+    cell_directory: Path
+    metadata: ProcessingMetadata
+    frames: Dict[int, MeshFrame]
+
+    def __getitem__(self, time_index: int) -> MeshFrame:
+        """Access frame by time index."""
+        if time_index not in self.frames:
+            raise KeyError(f"Frame {time_index} not found. Available: {self.time_indices}")
+        return self.frames[time_index]
+
+    def __iter__(self) -> Iterator[Tuple[int, MeshFrame]]:
+        """Iterate over (time_index, frame) pairs in sorted order."""
+        for time_idx in sorted(self.frames.keys()):
+            yield time_idx, self.frames[time_idx]
+
+    def __len__(self) -> int:
+        """Number of frames."""
+        return len(self.frames)
+
+    def __contains__(self, time_index: int) -> bool:
+        """Check if time index exists."""
+        return time_index in self.frames
+
+    @property
+    def time_indices(self) -> List[int]:
+        """List of available time indices (sorted)."""
+        return sorted(self.frames.keys())
+
+    @property
+    def n_frames(self) -> int:
+        """Number of frames."""
+        return len(self.frames)

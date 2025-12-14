@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "MeshAnalyzer"
-version = "1.0.0"
-description = "3D mesh analysis package for u-shape3D immune cell morphology data"
+name = "CellAnalyzer"
+version = "2.0.0"
+description = "Quantitative 3D morphology analysis for cell surface reconstructions from LLSM"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -47,17 +47,17 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/MeshAnalyzer"
-Documentation = "https://meshanalyzer.readthedocs.io"
-Repository = "https://github.com/yourusername/MeshAnalyzer.git"
-"Bug Tracker" = "https://github.com/yourusername/MeshAnalyzer/issues"
+Homepage = "https://github.com/philius19/CellAnalyzer"
+Documentation = "https://cellanalyzer.readthedocs.io"
+Repository = "https://github.com/philius19/CellAnalyzer.git"
+"Bug Tracker" = "https://github.com/philius19/CellAnalyzer/issues"
 
 [tool.setuptools]
 # Automatically discover packages
-packages = {find = {where = ["."], include = ["MeshAnalyzer*"], exclude = ["tests*", "Example*", "Notebooks*", "Experimental*"]}}
+packages = {find = {where = ["."], include = ["CellAnalyzer*"], exclude = ["tests*", "Example*", "Notebooks*", "Experimental*"]}}
 
 [tool.setuptools.package-data]
-MeshAnalyzer = ["*.md", "*.txt"]
+CellAnalyzer = ["*.md", "*.txt"]
 
 [tool.black]
 line-length = 100
@@ -78,4 +78,4 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --cov=MeshAnalyzer --cov-report=html --cov-report=term"
+addopts = "-v --cov=CellAnalyzer --cov-report=html --cov-report=term"

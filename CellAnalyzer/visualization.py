@@ -1,8 +1,10 @@
 """Visualization functions for mesh analysis."""
-from typing import Optional, Union, Tuple
+from typing import Optional, Union, Tuple, List
 from contextlib import contextmanager
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
+from vedo import Mesh, Plotter
 
 from .datatypes import MeshFrame
 
