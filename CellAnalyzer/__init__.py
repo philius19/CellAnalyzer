@@ -11,7 +11,9 @@ from .datatypes import (
     AnalysisResults,
     MeshStatistics,
     CurvatureStatistics,
-    QualityMetrics
+    QualityMetrics,
+    MotionData,
+    MotionStatistics
 )
 from .visualization import basic_spatial_plot, publication_style
 
@@ -44,6 +46,8 @@ __all__ = [
     'CellData',
     'ProcessingMetadata',
     'AnalysisResults',
+    'MotionData',
+    'MotionStatistics',
     'basic_spatial_plot',
     'publication_style'
 ]

@@ -45,7 +45,7 @@ class CurvatureStatistics:
     min: float
     max: float
     percentiles: Dict[int, float] = field(default_factory=dict)
-    
+
     @classmethod
     def from_array(cls, curvature: np.ndarray) -> 'CurvatureStatistics':
         """Create from curvature array."""
@@ -58,6 +58,69 @@ class CurvatureStatistics:
             min=float(np.min(curvature)),
             max=float(np.max(curvature)),
             percentiles={p: float(np.percentile(curvature, p)) for p in percentile_values}
+        )
+
+
+@dataclass(frozen=True)
+class MotionData:
+    """Motion data for a single timepoint.
+
+    Motion values represent surface displacement between consecutive frames:
+    - Positive = outward motion (protrusion)
+    - Negative = inward motion (retraction)
+    - NaN = no comparison available (first/last frame boundary)
+    - Units: voxels (multiply by pixel_size for physical units)
+    """
+    backward: Optional[np.ndarray] = None   # Motion to previous frame (per-face)
+    forward: Optional[np.ndarray] = None    # Motion to next frame (per-face)
+
+    @property
+    def has_backward(self) -> bool:
+        """Check if backward motion data is available."""
+        return self.backward is not None and not np.all(np.isnan(self.backward))
+
+    @property
+    def has_forward(self) -> bool:
+        """Check if forward motion data is available."""
+        return self.forward is not None and not np.all(np.isnan(self.forward))
+
+
+@dataclass(frozen=True)
+class MotionStatistics:
+    """Statistics for motion distribution.
+
+    Computed from per-face motion values (NaN values excluded).
+    """
+    mean: float
+    std: float
+    median: float
+    min: float
+    max: float
+    mean_magnitude: float      # Mean of |motion|
+    active_fraction: float     # Fraction with |motion| > threshold
+    percentiles: Dict[int, float] = field(default_factory=dict)
+
+    @classmethod
+    def from_array(cls, motion: np.ndarray, threshold: float = 1.0) -> 'MotionStatistics':
+        """Create from motion array (NaN values excluded)."""
+        valid = motion[~np.isnan(motion)]
+        if len(valid) == 0:
+            return cls(
+                mean=float('nan'), std=float('nan'), median=float('nan'),
+                min=float('nan'), max=float('nan'), mean_magnitude=float('nan'),
+                active_fraction=0.0, percentiles={}
+            )
+
+        percentile_values = [1, 5, 25, 50, 75, 95, 99]
+        return cls(
+            mean=float(np.mean(valid)),
+            std=float(np.std(valid)),
+            median=float(np.median(valid)),
+            min=float(np.min(valid)),
+            max=float(np.max(valid)),
+            mean_magnitude=float(np.mean(np.abs(valid))),
+            active_fraction=float(np.sum(np.abs(valid) > threshold) / len(valid)),
+            percentiles={p: float(np.percentile(valid, p)) for p in percentile_values}
         )
 
 
@@ -89,16 +152,17 @@ class AnalysisResults:
     mesh_stats: Optional[MeshStatistics] = None
     curvature_stats: Optional[CurvatureStatistics] = None
     quality_metrics: Optional[QualityMetrics] = None
-    
+    motion_stats: Optional[MotionStatistics] = None
+
     def is_complete(self) -> bool:
         """Check if all analyses have been run."""
         return all([self.mesh_stats, self.curvature_stats, self.quality_metrics])
-    
+
     def summary(self) -> str:
         """Generate human-readable summary."""
         if not self.mesh_stats:
             return "No analysis performed yet."
-        
+
         lines = [
             "=== Analysis Summary ===",
             f"Vertices: {self.mesh_stats.n_vertices:,}",
@@ -106,13 +170,19 @@ class AnalysisResults:
             f"Volume: {self.mesh_stats.volume_um3:.2f} μm³",
             f"Surface Area: {self.mesh_stats.surface_area_um2:.2f} μm²",
         ]
-        
+
         if self.curvature_stats:
             lines.extend([
                 f"\nCurvature: {self.curvature_stats.mean:.4f} ± {self.curvature_stats.std:.4f}",
                 f"Range: [{self.curvature_stats.min:.4f}, {self.curvature_stats.max:.4f}]"
             ])
-        
+
+        if self.motion_stats and not np.isnan(self.motion_stats.mean):
+            lines.extend([
+                f"\nMotion: {self.motion_stats.mean:.3f} ± {self.motion_stats.std:.3f} voxels",
+                f"Active fraction: {self.motion_stats.active_fraction:.1%}"
+            ])
+
         if self.quality_metrics:
             warnings = self.quality_metrics.get_warnings()
             if warnings:
@@ -205,6 +275,7 @@ class MeshFrame:
     time_index: int = 0
     metadata: Optional[ProcessingMetadata] = None
     auxiliary: Optional[AuxiliaryMeshData] = None
+    motion: Optional[MotionData] = None  # Motion data (backward/forward per-face)
     _face_centers_cache: Optional[np.ndarray] = field(default=None, init=False, repr=False)
 
     @property

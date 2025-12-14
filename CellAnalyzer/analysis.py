@@ -1,6 +1,6 @@
 """Statistical analysis functions for mesh data."""
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 import numpy as np
 import vedo
 
@@ -9,6 +9,7 @@ from .datatypes import (
     MeshFrame,
     MeshStatistics,
     CurvatureStatistics,
+    MotionStatistics,
     AnalysisResults,
     DEFAULT_PIXEL_SIZE_XY_UM,
     DEFAULT_PIXEL_SIZE_Z_UM
@@ -119,16 +120,45 @@ def calculate_curvature_statistics(frame: MeshFrame) -> CurvatureStatistics:
     return CurvatureStatistics.from_array(frame.curvature)
 
 
+def calculate_motion_statistics(frame: MeshFrame, threshold: float = 1.0) -> Optional[MotionStatistics]:
+    """
+    Calculate motion statistics from MeshFrame.
+
+    Uses backward motion by default (motion to previous frame).
+    Falls back to forward motion if backward is not available.
+
+    Parameters:
+        frame: MeshFrame with motion data
+        threshold: Motion threshold for "active" fraction (default: 1.0 voxel)
+
+    Returns:
+        MotionStatistics or None if no motion data available
+    """
+    if frame.motion is None:
+        return None
+
+    # Prefer backward motion, fall back to forward
+    if frame.motion.has_backward:
+        motion_array = frame.motion.backward
+    elif frame.motion.has_forward:
+        motion_array = frame.motion.forward
+    else:
+        return None
+
+    return MotionStatistics.from_array(motion_array, threshold=threshold)
+
+
 def calculate_frame_statistics(frame: MeshFrame) -> AnalysisResults:
     """
     Calculate complete statistics for a MeshFrame.
 
-    Combines mesh, curvature, and quality metrics into single result.
+    Combines mesh, curvature, quality, and motion metrics into single result.
     """
     return AnalysisResults(
         mesh_stats=calculate_mesh_statistics(frame),
         curvature_stats=calculate_curvature_statistics(frame),
-        quality_metrics=calculate_mesh_quality_metrics(frame.mesh)
+        quality_metrics=calculate_mesh_quality_metrics(frame.mesh),
+        motion_stats=calculate_motion_statistics(frame)
     )
 
 

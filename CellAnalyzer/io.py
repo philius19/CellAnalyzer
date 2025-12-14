@@ -23,6 +23,7 @@ from .datatypes import (
     ProcessingMetadata,
     AuxiliaryMeshData,
     MeshFrame,
+    MotionData,
     DEFAULT_MESH_PARAMETERS,
     DEFAULT_PIXEL_SIZE_XY_NM,
     DEFAULT_PIXEL_SIZE_Z_NM,
@@ -59,9 +60,17 @@ def load_metadata_file(cell_dir: Path) -> ProcessingMetadata:
     data = loadmat(str(metadata_path))
     m = data['metadata']
 
+    # Helper to get attribute from dict or mat_struct
+    def get_attr(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        elif hasattr(obj, key):
+            return getattr(obj, key)
+        return default
+
     # Scalar extraction helper
     def scalar(key, default=None):
-        val = m.get(key, default)
+        val = get_attr(m, key, default)
         if val is None:
             return default
         arr = np.asarray(val).squeeze()
@@ -75,9 +84,9 @@ def load_metadata_file(cell_dir: Path) -> ProcessingMetadata:
     time_interval_sec = scalar('time_interval_sec', 1.0)
 
     # Extract provenance
-    source_image_path = str(m.get('source_image_path', ''))
-    matlab_version = str(m.get('matlab_version', ''))
-    processing_date_str = m.get('processing_date', None)
+    source_image_path = str(get_attr(m, 'source_image_path', ''))
+    matlab_version = str(get_attr(m, 'matlab_version', ''))
+    processing_date_str = get_attr(m, 'processing_date', None)
 
     processing_date = None
     if processing_date_str:
@@ -87,10 +96,10 @@ def load_metadata_file(cell_dir: Path) -> ProcessingMetadata:
             pass
 
     # Extract mesh parameters
-    mp = m.get('mesh_parameters', {})
+    mp = get_attr(m, 'mesh_parameters', {})
 
     def param(key, default_val):
-        val = mp.get(key, default_val)
+        val = get_attr(mp, key, default_val)
         if isinstance(default_val, bool):
             return bool(val)
         if isinstance(default_val, (int, np.integer)):
@@ -290,13 +299,67 @@ def load_auxiliary_data(mesh_dir: Path, channel: int, time_index: int) -> Auxili
     )
 
 
+def load_motion_backward(filepath: Path) -> np.ndarray:
+    """Load backward motion data (distance to previous frame)."""
+    data = loadmat(str(filepath))
+    return np.array(data['motion']).flatten().astype(np.float32)
+
+
+def load_motion_forward(filepath: Path) -> np.ndarray:
+    """Load forward motion data (distance to next frame)."""
+    data = loadmat(str(filepath))
+    return np.array(data['motionForwards']).flatten().astype(np.float32)
+
+
+def load_motion_data(motion_dir: Path, channel: int, time_index: int) -> Optional[MotionData]:
+    """
+    Load motion data for a single timepoint.
+
+    Motion files are located in MeshMotion/ch{channel}/ directory:
+    - motion_{channel}_{time_index}.mat → backward motion
+    - motionForwards_{channel}_{time_index}.mat → forward motion
+
+    Parameters:
+        motion_dir: Path to MeshMotion/ch{channel}/ directory
+        channel: Channel number
+        time_index: Time index
+
+    Returns:
+        MotionData with backward/forward arrays, or None if no data found
+    """
+    backward_path = motion_dir / f'motion_{channel}_{time_index}.mat'
+    forward_path = motion_dir / f'motionForwards_{channel}_{time_index}.mat'
+
+    backward = None
+    forward = None
+
+    if backward_path.exists():
+        try:
+            backward = load_motion_backward(backward_path)
+        except Exception as e:
+            logger.debug(f"Failed to load backward motion: {e}")
+
+    if forward_path.exists():
+        try:
+            forward = load_motion_forward(forward_path)
+        except Exception as e:
+            logger.debug(f"Failed to load forward motion: {e}")
+
+    if backward is None and forward is None:
+        return None
+
+    return MotionData(backward=backward, forward=forward)
+
+
 def load_mesh_frame(
     surface_path: Path,
     curvature_path: Path,
     pixel_size_xy: float = DEFAULT_PIXEL_SIZE_XY_UM,
     pixel_size_z: float = DEFAULT_PIXEL_SIZE_Z_UM,
     metadata: Optional[ProcessingMetadata] = None,
-    load_auxiliary: bool = False
+    load_auxiliary: bool = False,
+    load_motion: bool = False,
+    motion_dir: Optional[Path] = None
 ) -> MeshFrame:
     """
     Load complete mesh frame data from MATLAB files.
@@ -311,6 +374,8 @@ def load_mesh_frame(
         pixel_size_z: Z pixel size in micrometers (default from constants)
         metadata: Optional ProcessingMetadata (auto-loaded if available)
         load_auxiliary: Load auxiliary data (normals, Gaussian curvature, etc.)
+        load_motion: Load motion data (backward/forward displacement per face)
+        motion_dir: Path to MeshMotion/ch{channel}/ directory (auto-discovered if None)
 
     Returns:
         MeshFrame with all data loaded and validated
@@ -320,7 +385,8 @@ def load_mesh_frame(
             Path('surface_1_1.mat'),
             Path('meanCurvature_1_1.mat'),
             pixel_size_xy=0.103,
-            pixel_size_z=0.217
+            pixel_size_z=0.217,
+            load_motion=True
         )
     """
     # Load geometry
@@ -334,18 +400,29 @@ def load_mesh_frame(
         logger.debug("Negative mesh volume detected, reversing normals")
         mesh = mesh.clone().reverse()
 
-    # Extract time index from filename (e.g., surface_1_42.mat -> time_index=42)
+    # Extract channel and time index from filename (e.g., surface_1_42.mat)
     match = re.search(r'_(\d+)_(\d+)\.mat$', surface_path.name)
-    time_index = int(match.group(2)) if match else 0
+    if match:
+        channel = int(match.group(1))
+        time_index = int(match.group(2))
+    else:
+        channel = 1
+        time_index = 0
 
     # Load auxiliary data if requested
     auxiliary = None
     if load_auxiliary:
-        match_ch_time = re.search(r'_(\d+)_(\d+)\.mat$', surface_path.name)
-        if match_ch_time:
-            channel = int(match_ch_time.group(1))
-            time_idx = int(match_ch_time.group(2))
-            auxiliary = load_auxiliary_data(surface_path.parent, channel, time_idx)
+        auxiliary = load_auxiliary_data(surface_path.parent, channel, time_index)
+
+    # Load motion data if requested
+    motion = None
+    if load_motion:
+        if motion_dir is None:
+            # Auto-discover motion directory (sibling to Mesh directory)
+            # e.g., .../Mesh/ch1/ -> .../MeshMotion/ch1/
+            motion_dir = surface_path.parent.parent.parent / 'MeshMotion' / f'ch{channel}'
+        if motion_dir.exists():
+            motion = load_motion_data(motion_dir, channel, time_index)
 
     # Create metadata if not provided (use defaults)
     if metadata is None:
@@ -367,7 +444,8 @@ def load_mesh_frame(
         mesh=mesh,
         time_index=time_index,
         metadata=metadata,
-        auxiliary=auxiliary
+        auxiliary=auxiliary,
+        motion=motion
     )
 
 
@@ -383,7 +461,8 @@ def save_results_to_json(results: dict, filepath: Path) -> None:
 
 
 def load_cell_directory(cell_dir: Path, channel: int = 1,
-                       load_auxiliary: bool = False) -> 'CellData':
+                       load_auxiliary: bool = False,
+                       load_motion: bool = False) -> 'CellData':
     """
     Load complete cell data from u-shape3D output directory.
 
@@ -393,6 +472,7 @@ def load_cell_directory(cell_dir: Path, channel: int = 1,
         cell_dir: Path to cell directory
         channel: Channel number (default: 1)
         load_auxiliary: Load auxiliary data (normals, Gaussian curv, etc.)
+        load_motion: Load motion data (backward/forward displacement per face)
 
     Returns:
         CellData with all frames loaded
@@ -412,6 +492,12 @@ def load_cell_directory(cell_dir: Path, channel: int = 1,
     mesh_dir = cell_dir / 'Morphology' / 'Analysis' / 'Mesh' / f'ch{channel}'
     if not mesh_dir.exists():
         raise FileNotFoundError(f"Mesh directory not found: {mesh_dir}")
+
+    # Get motion directory (may not exist if motion wasn't computed)
+    motion_dir = cell_dir / 'Morphology' / 'Analysis' / 'MeshMotion' / f'ch{channel}'
+    if load_motion and not motion_dir.exists():
+        logger.debug(f"Motion directory not found: {motion_dir}")
+        motion_dir = None
 
     # Discover frames
     surface_files = sorted(mesh_dir.glob('surface_*.mat'))
@@ -443,7 +529,9 @@ def load_cell_directory(cell_dir: Path, channel: int = 1,
                 pixel_size_xy=pixel_size_xy,
                 pixel_size_z=pixel_size_z,
                 metadata=metadata,
-                load_auxiliary=load_auxiliary
+                load_auxiliary=load_auxiliary,
+                load_motion=load_motion,
+                motion_dir=motion_dir
             )
             frames[time_index] = frame
 
