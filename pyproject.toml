@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Philipp Kaintoch", email = "philipp.kaintoch.@gmail.com"}
+    {name = "Philipp Kaintoch", email = "philipp.kaintoch@gmail.com"}
 ]
 keywords = ["mesh", "3d-analysis", "microscopy", "cell-biology", "morphology"]
 
